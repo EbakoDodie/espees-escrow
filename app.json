@@ -2,7 +2,7 @@
   "expo": {
     "name": "Espees Escrow",
     "slug": "espees-escrow",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -22,16 +22,28 @@
         "backgroundColor": "#0A0A0A"
       },
       "package": "com.ebakododie.espeesescrow",
-      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"]
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#FFD700"
+        }
+      ]
+    ],
     "scheme": "espeesescrow",
     "owner": "ebakododie",
     "extra": {
       "eas": {
-        "projectId": "espees-escrow"
+        "projectId": "62235ee8-694a-4327-b4ec-c5ec933e0b82"
       }
     }
   }
