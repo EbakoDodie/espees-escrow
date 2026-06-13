@@ -30,15 +30,6 @@
         "VIBRATE"
       ]
     },
-    "plugins": [
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#FFD700"
-        }
-      ]
-    ],
     "scheme": "espeesescrow",
     "owner": "ebakododie",
     "extra": {
