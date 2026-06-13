@@ -4,10 +4,10 @@
     "slug": "espees-escrow",
     "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "icon.png.png",
     "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "splash.png.png",
       "resizeMode": "contain",
       "backgroundColor": "#0A0A0A"
     },
@@ -18,7 +18,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "adaptive-icon.png.png",
         "backgroundColor": "#0A0A0A"
       },
       "package": "com.ebakododie.espeesescrow",
