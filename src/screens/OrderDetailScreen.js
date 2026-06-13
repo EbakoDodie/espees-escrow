@@ -61,16 +61,15 @@ export default function OrderDetailScreen({ route, navigation }) {
 
   const handlePayNow = async () => {
     const txRef = `ESCROW-${order.id}-${Date.now()}`;
-    const paymentUrl = `https://checkout.flutterwave.com/v3/hosted/pay?` +
-      `public_key=${CONFIG.FLUTTERWAVE_PUBLIC_KEY}` +
-      `&tx_ref=${txRef}` +
-      `&amount=${totalRaw}` +
-      `&currency=${order.currency}` +
-      `&customer_email=${user.email}` +
-      `&customer_name=${encodeURIComponent(profile.name)}` +
-      `&customization_title=Espees%20Escrow` +
-      `&customization_description=P2P%20Escrow%20Payment%20for%20${order.amount}%20ESP`;
-
+    const paymentUrl = `https://checkout.flutterwave.com/v3/hosted/pay` +
+  `?public_key=${CONFIG.FLUTTERWAVE_PUBLIC_KEY}` +
+  `&tx_ref=${txRef}` +
+  `&amount=${totalRaw}` +
+  `&currency=${order.currency}` +
+  `&customer[email]=${user.email}` +
+  `&customer[name]=${encodeURIComponent(profile.name)}` +
+  `&customization[title]=Espees%20Escrow` +
+  `&customization[description]=Escrow%20Payment`;
     try {
       await Linking.openURL(paymentUrl);
       // After browser opens, ask for confirmation when they return
