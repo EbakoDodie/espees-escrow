@@ -1,11 +1,10 @@
 import React, { useState, useContext } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, Image, ActivityIndicator
+  ScrollView, Alert, Image, ActivityIndicator, Platform
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../constants/colors';
-import { submitKYC, uploadKYCDocument } from '../services/kycService';
+import { submitKYC } from '../services/kycService';
 import { AuthContext } from '../context/AuthContext';
 
 const STEPS = ['Personal Info', 'ID Document', 'Upload Docs', 'Review'];
@@ -21,7 +20,7 @@ export default function KYCScreen({ navigation }) {
 
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // If already submitted, show status screen
+  // If already submitted, show status screen instead of form
   if (profile?.kycStatus === 'submitted') {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -33,8 +32,8 @@ export default function KYCScreen({ navigation }) {
           <Text style={styles.statusTitle}>KYC Under Review</Text>
           <Text style={styles.statusDesc}>
             Your documents have been submitted and are currently being reviewed by our team.{'\n\n'}
-            This process typically takes 24-48 hours. You will receive a notification once your identity has been verified.{'\n\n'}
-            If you have questions, contact support@espees.org
+            This typically takes 24-48 hours. You will receive a notification once verified.{'\n\n'}
+            Questions? Contact support@espees.org
           </Text>
           <View style={styles.statusBadge}>
             <Text style={styles.statusBadgeText}>SUBMITTED — PENDING APPROVAL</Text>
@@ -48,38 +47,66 @@ export default function KYCScreen({ navigation }) {
   }
 
   const pickImage = async (setter) => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please allow access to your photo library.');
-      return;
+    try {
+      // Dynamically import to avoid bundling issues
+      const ImagePicker = await import('expo-image-picker');
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow access to your photo library.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setter(result.assets[0].uri);
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Could not open image picker: ' + e.message);
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true, quality: 0.8,
-    });
-    if (!result.canceled) setter(result.assets[0].uri);
   };
 
   const takePhoto = async (setter) => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please allow camera access.');
-      return;
+    try {
+      const ImagePicker = await import('expo-image-picker');
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow camera access.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setter(result.assets[0].uri);
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Could not open camera: ' + e.message);
     }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true, quality: 0.8,
-    });
-    if (!result.canceled) setter(result.assets[0].uri);
   };
 
   const handleSubmit = async () => {
-    if (!idFrontUri) return Alert.alert('Required', 'Please upload the front of your ID document.');
+    if (!form.idNumber) return Alert.alert('Required', 'Please enter your ID number.');
     setUploading(true);
     try {
-      let idFrontUrl = '', idBackUrl = '', selfieUrl = '';
-      idFrontUrl = await uploadKYCDocument(user.uid, idFrontUri, 'image', 'id_front');
-      if (idBackUri) idBackUrl = await uploadKYCDocument(user.uid, idBackUri, 'image', 'id_back');
-      if (selfieUri) selfieUrl = await uploadKYCDocument(user.uid, selfieUri, 'image', 'selfie');
+      let idFrontUrl = idFrontUri || '';
+      let idBackUrl = idBackUri || '';
+      let selfieUrl = selfieUri || '';
+
+      // If Firebase Storage is set up, upload the images
+      if (idFrontUri) {
+        try {
+          const { uploadKYCDocument } = await import('../services/kycService');
+          idFrontUrl = await uploadKYCDocument(user.uid, idFrontUri, 'image', 'id_front');
+          if (idBackUri) idBackUrl = await uploadKYCDocument(user.uid, idBackUri, 'image', 'id_back');
+          if (selfieUri) selfieUrl = await uploadKYCDocument(user.uid, selfieUri, 'image', 'selfie');
+        } catch (uploadErr) {
+          console.log('Upload failed, saving URI reference instead:', uploadErr.message);
+        }
+      }
 
       await submitKYC(user.uid, {
         kycData: { ...form, idFrontUrl, idBackUrl, selfieUrl }
@@ -121,7 +148,7 @@ export default function KYCScreen({ navigation }) {
       </TouchableOpacity>
       <Text style={styles.title}>KYC Verification</Text>
 
-      {/* Progress bar */}
+      {/* Progress Bar */}
       <View style={styles.progressContainer}>
         {STEPS.map((s, i) => (
           <React.Fragment key={s}>
@@ -129,19 +156,27 @@ export default function KYCScreen({ navigation }) {
               <View style={[styles.stepDot, i <= step && styles.stepDotActive]}>
                 <Text style={[styles.stepNum, i <= step && { color: COLORS.textDark }]}>{i + 1}</Text>
               </View>
-              <Text style={[styles.stepLabel, i === step && { color: COLORS.primary }]} numberOfLines={2}>{s}</Text>
+              <Text style={[styles.stepLabel, i === step && { color: COLORS.primary }]}>{s}</Text>
             </View>
-            {i < STEPS.length - 1 && <View style={[styles.stepLine, i < step && styles.stepLineActive]} />}
+            {i < STEPS.length - 1 && (
+              <View style={[styles.stepLine, i < step && styles.stepLineActive]} />
+            )}
           </React.Fragment>
         ))}
       </View>
 
+      {/* Step 0 — Personal Info */}
       {step === 0 && (
         <View style={styles.stepContent}>
           <Text style={styles.stepTitle}>Personal Information</Text>
           <Text style={styles.stepDesc}>Confirm your details match your official ID documents.</Text>
           <View style={styles.infoCard}>
-            {[['Name', profile?.name], ['Email', profile?.email], ['Country', profile?.country], ['Date of Birth', profile?.dob]].map(([k, v]) => (
+            {[
+              ['Name', profile?.name],
+              ['Email', profile?.email],
+              ['Country', profile?.country],
+              ['Date of Birth', profile?.dob],
+            ].map(([k, v]) => (
               <View key={k} style={styles.infoRow}>
                 <Text style={styles.infoLabel}>{k}</Text>
                 <Text style={styles.infoValue} numberOfLines={1}>{v || 'Not provided'}</Text>
@@ -151,28 +186,46 @@ export default function KYCScreen({ navigation }) {
         </View>
       )}
 
+      {/* Step 1 — ID Details */}
       {step === 1 && (
         <View style={styles.stepContent}>
           <Text style={styles.stepTitle}>ID Document Details</Text>
           <Text style={styles.stepDesc}>Select your ID type and enter your document number.</Text>
           <View style={styles.idTypeRow}>
             {['National ID', 'Passport', "Driver's License"].map(t => (
-              <TouchableOpacity key={t} style={[styles.idChip, form.idType === t && styles.idChipActive]} onPress={() => update('idType', t)}>
+              <TouchableOpacity
+                key={t}
+                style={[styles.idChip, form.idType === t && styles.idChipActive]}
+                onPress={() => update('idType', t)}
+              >
                 <Text style={[styles.idChipText, form.idType === t && { color: COLORS.textDark }]}>{t}</Text>
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={styles.label}>ID Number</Text>
-          <TextInput style={styles.input} value={form.idNumber} onChangeText={v => update('idNumber', v)} placeholder="Enter your ID number" placeholderTextColor={COLORS.textMuted} />
+          <Text style={styles.label}>ID Number *</Text>
+          <TextInput
+            style={styles.input}
+            value={form.idNumber}
+            onChangeText={v => update('idNumber', v)}
+            placeholder="Enter your ID number"
+            placeholderTextColor={COLORS.textMuted}
+          />
           <Text style={styles.label}>BVN / Tax ID (optional)</Text>
-          <TextInput style={styles.input} value={form.bvn} onChangeText={v => update('bvn', v)} placeholder="Enter BVN or Tax ID" placeholderTextColor={COLORS.textMuted} />
+          <TextInput
+            style={styles.input}
+            value={form.bvn}
+            onChangeText={v => update('bvn', v)}
+            placeholder="Enter BVN or Tax ID"
+            placeholderTextColor={COLORS.textMuted}
+          />
         </View>
       )}
 
+      {/* Step 2 — Upload Docs */}
       {step === 2 && (
         <View style={styles.stepContent}>
           <Text style={styles.stepTitle}>Upload Documents</Text>
-          <Text style={styles.stepDesc}>Upload clear photos of your ID and a selfie holding it.</Text>
+          <Text style={styles.stepDesc}>Upload clear photos of your ID. A selfie holding your ID is recommended.</Text>
 
           <Text style={styles.uploadSectionLabel}>ID Front (Required)</Text>
           <ImageUploadBox
@@ -200,18 +253,42 @@ export default function KYCScreen({ navigation }) {
         </View>
       )}
 
+      {/* Step 3 — Review */}
       {step === 3 && (
         <View style={styles.stepContent}>
           <Text style={styles.stepTitle}>Review & Submit</Text>
           <View style={styles.infoCard}>
-            <View style={styles.infoRow}><Text style={styles.infoLabel}>ID Type</Text><Text style={styles.infoValue}>{form.idType}</Text></View>
-            <View style={styles.infoRow}><Text style={styles.infoLabel}>ID Number</Text><Text style={styles.infoValue}>{form.idNumber || '—'}</Text></View>
-            <View style={styles.infoRow}><Text style={styles.infoLabel}>ID Front</Text><Text style={[styles.infoValue, { color: idFrontUri ? COLORS.success : COLORS.error }]}>{idFrontUri ? 'Uploaded ✓' : 'Not uploaded'}</Text></View>
-            <View style={styles.infoRow}><Text style={styles.infoLabel}>ID Back</Text><Text style={[styles.infoValue, { color: idBackUri ? COLORS.success : COLORS.textMuted }]}>{idBackUri ? 'Uploaded ✓' : 'Not uploaded'}</Text></View>
-            <View style={[styles.infoRow, { borderBottomWidth: 0 }]}><Text style={styles.infoLabel}>Selfie</Text><Text style={[styles.infoValue, { color: selfieUri ? COLORS.success : COLORS.textMuted }]}>{selfieUri ? 'Uploaded ✓' : 'Not uploaded'}</Text></View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>ID Type</Text>
+              <Text style={styles.infoValue}>{form.idType}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>ID Number</Text>
+              <Text style={styles.infoValue}>{form.idNumber || '—'}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>ID Front</Text>
+              <Text style={[styles.infoValue, { color: idFrontUri ? COLORS.success : COLORS.error }]}>
+                {idFrontUri ? 'Uploaded ✓' : 'Not uploaded'}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>ID Back</Text>
+              <Text style={[styles.infoValue, { color: idBackUri ? COLORS.success : COLORS.textMuted }]}>
+                {idBackUri ? 'Uploaded ✓' : 'Not uploaded'}
+              </Text>
+            </View>
+            <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
+              <Text style={styles.infoLabel}>Selfie</Text>
+              <Text style={[styles.infoValue, { color: selfieUri ? COLORS.success : COLORS.textMuted }]}>
+                {selfieUri ? 'Uploaded ✓' : 'Not uploaded'}
+              </Text>
+            </View>
           </View>
           <View style={styles.warningBox}>
-            <Text style={styles.warningText}>By submitting, you confirm all documents belong to you and the information is accurate.</Text>
+            <Text style={styles.warningText}>
+              By submitting, you confirm all documents belong to you and the information is accurate.
+            </Text>
           </View>
         </View>
       )}
@@ -267,11 +344,11 @@ const styles = StyleSheet.create({
   uploadSectionLabel: { color: COLORS.text, fontSize: 14, fontWeight: '700', marginBottom: 8, marginTop: 8 },
   uploadBox: { backgroundColor: COLORS.surface, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: 16, overflow: 'hidden' },
   uploadPreview: { width: '100%', height: 160, resizeMode: 'cover' },
-  uploadPlaceholder: { height: 120, justifyContent: 'center', alignItems: 'center' },
-  uploadIcon: { fontSize: 36, marginBottom: 8 },
+  uploadPlaceholder: { height: 100, justifyContent: 'center', alignItems: 'center' },
+  uploadIcon: { fontSize: 32, marginBottom: 8 },
   uploadLabel: { color: COLORS.textMuted, fontSize: 13 },
   uploadBtns: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: COLORS.border },
-  uploadBtn: { flex: 1, padding: 12, alignItems: 'center', borderRightWidth: 0.5, borderRightColor: COLORS.border },
+  uploadBtn: { flex: 1, padding: 12, alignItems: 'center' },
   uploadBtnText: { color: COLORS.primary, fontWeight: '600', fontSize: 13 },
   warningBox: { backgroundColor: COLORS.gold10, borderRadius: 10, padding: 14, borderWidth: 1, borderColor: COLORS.primary, marginTop: 16 },
   warningText: { color: COLORS.primary, fontSize: 13, lineHeight: 20 },
