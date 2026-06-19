@@ -1,0 +1,16 @@
+export const COLORS = {
+  primary: '#FFD700',
+  primaryDark: '#B8860B',
+  background: '#0A0A0A',
+  surface: '#141414',
+  surfaceLight: '#1E1E1E',
+  text: '#FFFFFF',
+  textMuted: '#888888',
+  textDark: '#0A0A0A',
+  success: '#22C55E',
+  error: '#EF4444',
+  warning: '#F59E0B',
+  border: '#2A2A2A',
+  gold20: 'rgba(255,215,0,0.2)',
+  gold10: 'rgba(255,215,0,0.1)',
+};
