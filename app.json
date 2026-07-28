@@ -12,6 +12,11 @@
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
+    "extra": {
+  "eas": {
+    "projectId": "62235ee8-694a-4327-b4ec-c5ec933e0b82"
+  }
+}
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.equb.app"
