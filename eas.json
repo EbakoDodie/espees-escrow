@@ -11,6 +11,9 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "npm": {
+        "legacyPeerDeps": true
       }
     },
     "production": {}
